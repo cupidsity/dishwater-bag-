@@ -32,11 +32,11 @@ const bagFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`bag - ${frameN
 const BACKGROUND_SCALE = 8;
 const FALLING_FRAMES_PER_SECOND = 10;
 
-// the bag sits idle swapping between frames 1 and 2, then on a catch it plays
-// frame 5 (cat diving in) and frame 4 (cat settled) before going back to idle
+// the bag sits idle swapping between frames 1 and 2, then on a catch it holds
+// one of the two cat-in-the-bag poses long enough to read before going back
 const BAG_IDLE_FRAMES_PER_SECOND = 2.5;
-const BAG_DIVE_SECONDS = 0.13;
-const BAG_SETTLE_SECONDS = 0.32;
+const BAG_CATCH_SECONDS = 0.45;
+const BAG_CATCH_FRAMES = [3, 4];
 
 // the artwork sits inside a 640 square frame, these line the bag's mouth up with
 // the catch line and its body up with player.x
@@ -89,8 +89,9 @@ const player = {
   x: VIRTUAL_WIDTH / 2,
   y: VIRTUAL_HEIGHT - 146,
   idleAnimationTime: 0,
-  // counts up while the catch animation plays, null the rest of the time
-  catchAnimationTime: null
+  // counts up while the catch pose is held, null the rest of the time
+  catchAnimationTime: null,
+  catchFrameIndex: BAG_CATCH_FRAMES[0]
 };
 
 const pressedKeys = new Set();
@@ -258,7 +259,7 @@ function updatePlayer(deltaSeconds) {
 
   if (player.catchAnimationTime !== null) {
     player.catchAnimationTime += deltaSeconds;
-    if (player.catchAnimationTime >= BAG_DIVE_SECONDS + BAG_SETTLE_SECONDS) {
+    if (player.catchAnimationTime >= BAG_CATCH_SECONDS) {
       player.catchAnimationTime = null;
     }
   }
@@ -292,6 +293,7 @@ function updateFallingObjects(deltaSeconds) {
     if (isCaught(fallingObject)) {
       score += fallingObject.kind.points;
       player.catchAnimationTime = 0;
+      player.catchFrameIndex = BAG_CATCH_FRAMES[Math.floor(Math.random() * BAG_CATCH_FRAMES.length)];
       addFloatingText(`+${fallingObject.kind.points}`, fallingObject.x, fallingObject.y,
         fallingObject.kind.textColor);
       updateHud();
@@ -356,7 +358,7 @@ function drawBackground() {
 
 function currentBagFrame() {
   if (player.catchAnimationTime !== null) {
-    return player.catchAnimationTime < BAG_DIVE_SECONDS ? bagFrames[4] : bagFrames[3];
+    return bagFrames[player.catchFrameIndex];
   }
 
   const idleStep = Math.floor(player.idleAnimationTime * BAG_IDLE_FRAMES_PER_SECOND) % 2;
