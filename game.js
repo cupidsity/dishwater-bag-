@@ -256,6 +256,9 @@ function addFloatingText(text, x, y, color) {
 }
 
 function startGame() {
+  // no round starts until the leaderboard knows who is playing
+  if (window.Leaderboard && window.Leaderboard.needsName()) return;
+
   fallingObjects = [];
   floatingTexts = [];
   catchCommitments = [];
@@ -279,6 +282,8 @@ function endGame() {
   }
   updateHud();
   showOverlay("game over", `you caught ${score} point${score === 1 ? "" : "s"}.`, "play again");
+
+  if (window.Leaderboard) window.Leaderboard.submit(score);
 }
 
 function showOverlay(title, text, buttonLabel) {

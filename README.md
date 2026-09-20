@@ -55,6 +55,56 @@ things speed up over the first 60 seconds and then level off at 2.25x the
 starting pace, so it gets harder without running away from you. your best score
 is kept in `localStorage`.
 
+## leaderboard
+
+off until you connect it. with `leaderboard.js` left as it ships there is no
+name prompt and no board, the game plays exactly as it does offline.
+
+to turn it on:
+
+1. make a project at [supabase.com](https://supabase.com)
+2. open the sql editor and run `supabase-schema.sql`
+3. copy the project url and the **publishable** key (`sb_publishable_...`) from
+   project settings, api keys
+4. paste both into the top of `leaderboard.js`
+
+the publishable key is meant to sit in public client code, that is the whole
+point of it. supabase is retiring the older `anon` key by the end of 2026, so
+use the publishable one.
+
+### how it hangs together
+
+everyone gets a random id the first time they load the page, kept in
+`localStorage` alongside the name they typed. that id is what makes someone the
+same player next visit, so there is one row per person and a second game only
+ever raises their score, never adds a duplicate.
+
+worth knowing, that id lives in one browser. the same person on their phone, in
+another browser, or after clearing site data counts as somebody new. tying
+people together properly across devices means real accounts, which is a much
+bigger thing to build.
+
+the table has row level security on and no policies at all, so the key in the
+page cannot read or write it directly. the browser can only call two functions:
+
+| function | does |
+| --- | --- |
+| `submit_score` | upserts one row, keeps the higher score, caps the name at 16 characters |
+| `get_leaderboard` | returns names and scores only |
+
+`get_leaderboard` deliberately never returns player ids. an id is the only thing
+standing between a stranger and writing to someone else's row, so it stays out
+of the page. the name is set once when a player first appears and is never
+updated after, which means even a leaked id cannot be used to rename anybody.
+
+### it can still be cheated
+
+the game runs on the player's machine, so anyone who opens the console can call
+`Leaderboard.submit(99999)` by hand. the database caps a score at 100000 and
+refuses to lower an existing one, which stops the silly cases, but it cannot
+tell a real 300 from a typed one. that is true of any browser game without a
+server refereeing the play. fine for friends, not fine for prizes.
+
 ## files
 
 | file | holds |
@@ -62,6 +112,8 @@ is kept in `localStorage`.
 | `index.html` | the markup, the hud and the title / game over overlay |
 | `style.css` | page styling, the colour scheme and the responsive sizing |
 | `game.js` | everything else, the whole game |
+| `leaderboard.js` | names, player ids and talking to supabase |
+| `supabase-schema.sql` | the table and the two functions, run once |
 | `assets/` | the sprites, the background tile and the font |
 | `package.json` | the dev server script, vite is the only dependency |
 

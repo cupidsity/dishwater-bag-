@@ -22,9 +22,33 @@
       <p id="overlayText">catch the cats, dodge the poop. drop three cats and it's over.</p>
       <p class="overlay-keys">&larr; &rarr; or A / D to move &middot; P to pause</p>
       <button id="startButton" type="button">start</button>
+
+      <section id="leaderboard" class="leaderboard hidden">
+        <h2 class="leaderboard-title">best catchers</h2>
+        <ol id="leaderboardList" class="leaderboard-list"></ol>
+        <p id="leaderboardNote" class="leaderboard-note hidden"></p>
+      </section>
+    </div>
+
+    <div id="nameOverlay" class="overlay name-overlay hidden">
+      <h1>who's catching?</h1>
+      <p>this goes on the leaderboard, and it sticks with you next time.</p>
+      <form id="nameForm" class="name-form" autocomplete="off">
+        <input
+          id="nameInput"
+          class="name-input"
+          type="text"
+          maxlength="16"
+          required
+          placeholder="your name"
+          aria-label="your name"
+        />
+        <button type="submit">let's go</button>
+      </form>
     </div>
   </div>
 
+  <script src="leaderboard.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

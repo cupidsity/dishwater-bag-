@@ -92,8 +92,110 @@ body {
   backdrop-filter: blur(3px);
 }
 
-.overlay.hidden {
+.overlay.hidden,
+.hidden {
   display: none;
+}
+
+.overlay {
+  overflow-y: auto;
+}
+
+.leaderboard {
+  width: min(300px, 100%);
+  margin-top: 6px;
+}
+
+.leaderboard-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  color: var(--accent-color);
+}
+
+.leaderboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 8px;
+  font-size: 19px;
+  border-radius: 6px;
+}
+
+.leaderboard-row.is-you {
+  background: rgba(249, 192, 95, 0.16);
+  color: var(--accent-color);
+}
+
+.leaderboard-rank {
+  opacity: 0.55;
+  text-align: right;
+}
+
+.leaderboard-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.leaderboard-score {
+  color: var(--accent-color);
+}
+
+.leaderboard-row.is-you .leaderboard-score {
+  color: inherit;
+}
+
+.leaderboard-note {
+  margin: 6px 0 0;
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+.name-overlay {
+  z-index: 2;
+}
+
+.name-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.name-input {
+  width: min(260px, 80vw);
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 22px;
+  text-align: center;
+  color: var(--text-color);
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid rgba(244, 230, 214, 0.35);
+  border-radius: 10px;
+}
+
+.name-input::placeholder {
+  color: var(--text-color);
+  opacity: 0.4;
+}
+
+.name-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
 }
 
 .title-cat {
