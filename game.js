@@ -13,16 +13,23 @@ const startButton = document.getElementById("startButton");
 
 const BEST_SCORE_STORAGE_KEY = "dishwaterBagBestScore";
 const STARTING_LIVES = 3;
-const PLAYER_SPEED = 520;
+const PLAYER_SPEED = 560;
 const BASE_FALL_SPEED = 170;
 const BASE_SPAWN_INTERVAL = 0.85;
+
+// only ever ask the player to use this fraction of their top speed between two
+// catches, so a perfect run never depends on frame perfect movement
+const REACH_SAFETY_FACTOR = 0.7;
+
+// a hazard landing this close in time to a catchable object must not block it
+const HAZARD_CLEARANCE_SECONDS = 0.45;
 
 // each falling kind: how it looks, what catching it does
 const FALLING_KINDS = [
   { name: "drop", color: "#6fd3ff", radius: 15, points: 1, weight: 6, harmful: false },
   { name: "bubble", color: "#b58cff", radius: 19, points: 3, weight: 3, harmful: false },
   { name: "star", color: "#ffcf5c", radius: 13, points: 6, weight: 1.4, harmful: false },
-  { name: "sludge", color: "#ff5f6d", radius: 17, points: 0, weight: 2.6, harmful: true }
+  { name: "sludge", color: "#ff5f6d", radius: 17, points: 0, weight: 2.0, harmful: true }
 ];
 
 const totalKindWeight = FALLING_KINDS.reduce((runningTotal, kind) => runningTotal + kind.weight, 0);
@@ -38,6 +45,10 @@ const pressedKeys = new Set();
 
 let fallingObjects = [];
 let floatingTexts = [];
+
+// where and when the player has to be to catch each object still in flight,
+// used to keep every new spawn within reach of the previous one
+let catchCommitments = [];
 let score = 0;
 let bestScore = loadBestScore();
 let livesLeft = STARTING_LIVES;
@@ -75,16 +86,84 @@ function pickFallingKind() {
 
 function difficultyMultiplier() {
   // speeds things up steadily but flattens out so it stays playable
-  return 1 + Math.min(elapsedSeconds / 45, 1.6);
+  return 1 + Math.min(elapsedSeconds / 60, 1.25);
+}
+
+// objects fall at different speeds, so a new spawn can land between two that
+// are already in flight, the player must still be able to reach it from the one
+// before it and carry on to the one after it
+function neighbouringCommitments(arrivalTime) {
+  let before = { x: player.x, arrivalTime: elapsedSeconds };
+  let after = null;
+
+  for (const commitment of catchCommitments) {
+    if (commitment.arrivalTime <= arrivalTime) {
+      if (commitment.arrivalTime > before.arrivalTime) before = commitment;
+    } else if (after === null || commitment.arrivalTime < after.arrivalTime) {
+      after = commitment;
+    }
+  }
+
+  return { before, after };
+}
+
+function pickReachableX(kind, arrivalTime) {
+  const { before, after } = neighbouringCommitments(arrivalTime);
+
+  const reachFromBefore = PLAYER_SPEED
+    * Math.max(arrivalTime - before.arrivalTime, 0) * REACH_SAFETY_FACTOR;
+
+  let leftLimit = Math.max(kind.radius, before.x - reachFromBefore);
+  let rightLimit = Math.min(canvas.width - kind.radius, before.x + reachFromBefore);
+
+  if (after !== null) {
+    const reachToAfter = PLAYER_SPEED
+      * Math.max(after.arrivalTime - arrivalTime, 0) * REACH_SAFETY_FACTOR;
+    leftLimit = Math.max(leftLimit, after.x - reachToAfter);
+    rightLimit = Math.min(rightLimit, after.x + reachToAfter);
+  }
+
+  if (rightLimit < leftLimit) return before.x;
+  return leftLimit + Math.random() * (rightLimit - leftLimit);
+}
+
+function conflictsWithCatch(x, kind, arrivalTime) {
+  const blockingDistance = player.width / 2 + kind.radius;
+  return catchCommitments.some((commitment) =>
+    Math.abs(commitment.arrivalTime - arrivalTime) < HAZARD_CLEARANCE_SECONDS
+    && Math.abs(commitment.x - x) < blockingDistance);
+}
+
+function pickHazardX(kind, arrivalTime) {
+  // retry a few times so a hazard rarely sits on top of something worth catching
+  let x = 0;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    x = kind.radius + Math.random() * (canvas.width - kind.radius * 2);
+    if (!conflictsWithCatch(x, kind, arrivalTime)) return x;
+  }
+  return x;
 }
 
 function spawnFallingObject() {
   const kind = pickFallingKind();
+  const fallSpeed = (BASE_FALL_SPEED + Math.random() * 90) * difficultyMultiplier();
+  // start fully visible at the very top edge so nothing pops in mid fall
+  const spawnY = kind.radius;
+  const arrivalTime = elapsedSeconds + (player.y - spawnY) / fallSpeed;
+
+  const x = kind.harmful
+    ? pickHazardX(kind, arrivalTime)
+    : pickReachableX(kind, arrivalTime);
+
+  if (!kind.harmful) {
+    catchCommitments.push({ x, arrivalTime });
+  }
+
   fallingObjects.push({
     kind,
-    x: kind.radius + Math.random() * (canvas.width - kind.radius * 2),
-    y: -kind.radius,
-    fallSpeed: (BASE_FALL_SPEED + Math.random() * 90) * difficultyMultiplier(),
+    x,
+    y: spawnY,
+    fallSpeed,
     wobbleOffset: Math.random() * Math.PI * 2
   });
 }
@@ -96,6 +175,7 @@ function addFloatingText(text, x, y, color) {
 function startGame() {
   fallingObjects = [];
   floatingTexts = [];
+  catchCommitments = [];
   score = 0;
   livesLeft = STARTING_LIVES;
   elapsedSeconds = 0;
@@ -202,6 +282,9 @@ function updateFloatingTexts(deltaSeconds) {
 function update(deltaSeconds) {
   elapsedSeconds += deltaSeconds;
   updatePlayer(deltaSeconds);
+
+  catchCommitments = catchCommitments.filter(
+    (commitment) => commitment.arrivalTime > elapsedSeconds);
 
   timeUntilNextSpawn -= deltaSeconds;
   if (timeUntilNextSpawn <= 0) {
