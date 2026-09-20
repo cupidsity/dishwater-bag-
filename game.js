@@ -26,11 +26,15 @@ function loadImage(fileName) {
 const backgroundImage = loadImage("background.png");
 const fallingFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`falling - ${frameNumber}.png`));
 const bagFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`bag - ${frameNumber}.png`));
+const poopFrames = [loadImage("poop.png")];
 
 // the background is drawn once, blown up by a whole number of pixels so every
 // source pixel stays a crisp square, then centred and cropped to the canvas
 const BACKGROUND_SCALE = 8;
 const FALLING_FRAMES_PER_SECOND = 10;
+
+// a hazard landing this close in time to a cat must not stand in the way of it
+const HAZARD_CLEARANCE_SECONDS = 0.45;
 
 // the bag sits idle swapping between frames 1 and 2, then on a catch it holds
 // one of the two cat-in-the-bag poses long enough to read before going back
@@ -73,12 +77,18 @@ const BASE_SPAWN_INTERVAL = 0.85;
 // catches, so a perfect run never depends on frame perfect movement
 const REACH_SAFETY_FACTOR = 0.7;
 
-// every falling thing is the same cat, so the tiers are told apart by size:
+// the cats are all the same sprite so their tiers are told apart by size, the
+// poop is its own sprite and is the one thing you are meant to let fall.
 // spriteSize is what gets drawn, radius is the more forgiving catch box
 const FALLING_KINDS = [
-  { name: "big cat", spriteSize: 120, radius: 34, points: 1, weight: 6, textColor: PALETTE.barkDeep },
-  { name: "medium cat", spriteSize: 94, radius: 27, points: 3, weight: 3, textColor: PALETTE.ink },
-  { name: "small cat", spriteSize: 70, radius: 20, points: 6, weight: 1.4, textColor: PALETTE.berry }
+  { name: "big cat", frames: fallingFrames, spriteSize: 120, radius: 34,
+    points: 1, weight: 6, harmful: false, textColor: PALETTE.barkDeep },
+  { name: "medium cat", frames: fallingFrames, spriteSize: 94, radius: 27,
+    points: 3, weight: 3, harmful: false, textColor: PALETTE.ink },
+  { name: "small cat", frames: fallingFrames, spriteSize: 70, radius: 20,
+    points: 6, weight: 1.4, harmful: false, textColor: PALETTE.ink },
+  { name: "poop", frames: poopFrames, spriteSize: 72, radius: 16,
+    points: 0, weight: 2, harmful: true, textColor: PALETTE.berry }
 ];
 
 const totalKindWeight = FALLING_KINDS.reduce((runningTotal, kind) => runningTotal + kind.weight, 0);
@@ -180,15 +190,36 @@ function pickReachableX(kind, arrivalTime) {
   return leftLimit + Math.random() * (rightLimit - leftLimit);
 }
 
+function conflictsWithCatch(x, kind, arrivalTime) {
+  const blockingDistance = player.width / 2 + kind.radius;
+  return catchCommitments.some((commitment) =>
+    Math.abs(commitment.arrivalTime - arrivalTime) < HAZARD_CLEARANCE_SECONDS
+    && Math.abs(commitment.x - x) < blockingDistance);
+}
+
+function pickHazardX(kind, arrivalTime) {
+  // retry a few times so the poop rarely sits right on top of a cat
+  let x = 0;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    x = kind.radius + Math.random() * (VIRTUAL_WIDTH - kind.radius * 2);
+    if (!conflictsWithCatch(x, kind, arrivalTime)) return x;
+  }
+  return x;
+}
+
 function spawnFallingObject() {
   const kind = pickFallingKind();
   const fallSpeed = (BASE_FALL_SPEED + Math.random() * 90) * difficultyMultiplier();
   // start with the whole sprite on screen so no cat pops in mid fall
   const spawnY = kind.spriteSize / 2;
   const arrivalTime = elapsedSeconds + (player.y - spawnY) / fallSpeed;
-  const x = pickReachableX(kind, arrivalTime);
+  const x = kind.harmful
+    ? pickHazardX(kind, arrivalTime)
+    : pickReachableX(kind, arrivalTime);
 
-  catchCommitments.push({ x, arrivalTime });
+  if (!kind.harmful) {
+    catchCommitments.push({ x, arrivalTime });
+  }
 
   fallingObjects.push({
     kind,
@@ -291,17 +322,25 @@ function updateFallingObjects(deltaSeconds) {
     fallingObject.animationTime += deltaSeconds;
 
     if (isCaught(fallingObject)) {
-      score += fallingObject.kind.points;
-      player.catchAnimationTime = 0;
-      player.catchFrameIndex = BAG_CATCH_FRAMES[Math.floor(Math.random() * BAG_CATCH_FRAMES.length)];
-      addFloatingText(`+${fallingObject.kind.points}`, fallingObject.x, fallingObject.y,
-        fallingObject.kind.textColor);
-      updateHud();
+      if (fallingObject.kind.harmful) {
+        addFloatingText("ick", fallingObject.x, fallingObject.y, fallingObject.kind.textColor);
+        losePoint(1);
+      } else {
+        score += fallingObject.kind.points;
+        player.catchAnimationTime = 0;
+        player.catchFrameIndex = BAG_CATCH_FRAMES[Math.floor(Math.random() * BAG_CATCH_FRAMES.length)];
+        addFloatingText(`+${fallingObject.kind.points}`, fallingObject.x, fallingObject.y,
+          fallingObject.kind.textColor);
+        updateHud();
+      }
       continue;
     }
 
     if (fallingObject.y - fallingObject.kind.radius > VIRTUAL_HEIGHT) {
-      losePoint(1);
+      // the poop is meant to be dodged, only a dropped cat costs a life
+      if (!fallingObject.kind.harmful) {
+        losePoint(1);
+      }
       continue;
     }
 
@@ -381,9 +420,10 @@ function drawPlayer() {
 function drawFallingObjects() {
   for (const fallingObject of fallingObjects) {
     const wobble = Math.sin(elapsedSeconds * 4 + fallingObject.wobbleOffset) * 3;
+    const frames = fallingObject.kind.frames;
     const frameIndex = Math.floor(fallingObject.animationTime * FALLING_FRAMES_PER_SECOND)
-      % fallingFrames.length;
-    const frame = fallingFrames[frameIndex];
+      % frames.length;
+    const frame = frames[frameIndex];
 
     if (!frame.complete || frame.naturalWidth === 0) continue;
 
