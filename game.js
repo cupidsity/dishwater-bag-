@@ -3,7 +3,18 @@
 const canvas = document.getElementById("gameCanvas");
 const drawingContext = canvas.getContext("2d");
 
-// pixel art, never let the browser blur it while scaling
+// every position and size in this file is in these units, independent of how
+// many real pixels the canvas ends up being drawn at
+const VIRTUAL_WIDTH = 640;
+const VIRTUAL_HEIGHT = 720;
+
+// render at a multiple of that so the sprites stay sharp on a big screen
+const RENDER_SCALE = 2;
+
+canvas.width = VIRTUAL_WIDTH * RENDER_SCALE;
+canvas.height = VIRTUAL_HEIGHT * RENDER_SCALE;
+
+// resizing the canvas resets the context, so set this after
 drawingContext.imageSmoothingEnabled = false;
 
 function loadImage(fileName) {
@@ -15,12 +26,10 @@ function loadImage(fileName) {
 const backgroundImage = loadImage("background.png");
 const fallingFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`falling - ${frameNumber}.png`));
 
-// the background tile is tiny pixel art, blow it up by a whole number of pixels
-// so every source pixel stays a crisp square
-const BACKGROUND_SCALE = 4;
+// the background is drawn once, blown up by a whole number of pixels so every
+// source pixel stays a crisp square, then centred and cropped to the canvas
+const BACKGROUND_SCALE = 8;
 const FALLING_FRAMES_PER_SECOND = 10;
-
-let backgroundPattern = null;
 
 const scoreValueElement = document.getElementById("scoreValue");
 const bestValueElement = document.getElementById("bestValue");
@@ -53,8 +62,8 @@ const totalKindWeight = FALLING_KINDS.reduce((runningTotal, kind) => runningTota
 const player = {
   width: 110,
   height: 26,
-  x: canvas.width / 2,
-  y: canvas.height - 56
+  x: VIRTUAL_WIDTH / 2,
+  y: VIRTUAL_HEIGHT - 56
 };
 
 const pressedKeys = new Set();
@@ -130,7 +139,7 @@ function pickReachableX(kind, arrivalTime) {
     * Math.max(arrivalTime - before.arrivalTime, 0) * REACH_SAFETY_FACTOR;
 
   let leftLimit = Math.max(kind.radius, before.x - reachFromBefore);
-  let rightLimit = Math.min(canvas.width - kind.radius, before.x + reachFromBefore);
+  let rightLimit = Math.min(VIRTUAL_WIDTH - kind.radius, before.x + reachFromBefore);
 
   if (after !== null) {
     const reachToAfter = PLAYER_SPEED
@@ -176,7 +185,7 @@ function startGame() {
   livesLeft = STARTING_LIVES;
   elapsedSeconds = 0;
   timeUntilNextSpawn = 0.4;
-  player.x = canvas.width / 2;
+  player.x = VIRTUAL_WIDTH / 2;
   gameState = "playing";
   overlayElement.classList.add("hidden");
   updateHud();
@@ -223,7 +232,7 @@ function updatePlayer(deltaSeconds) {
   player.x += direction * PLAYER_SPEED * deltaSeconds;
 
   const halfWidth = player.width / 2;
-  player.x = Math.max(halfWidth, Math.min(canvas.width - halfWidth, player.x));
+  player.x = Math.max(halfWidth, Math.min(VIRTUAL_WIDTH - halfWidth, player.x));
 }
 
 function isCaught(fallingObject) {
@@ -250,7 +259,7 @@ function updateFallingObjects(deltaSeconds) {
       continue;
     }
 
-    if (fallingObject.y - fallingObject.kind.radius > canvas.height) {
+    if (fallingObject.y - fallingObject.kind.radius > VIRTUAL_HEIGHT) {
       losePoint(1);
       continue;
     }
@@ -286,36 +295,28 @@ function update(deltaSeconds) {
   updateFloatingTexts(deltaSeconds);
 }
 
-// the tile is only built once the png has actually decoded
-function ensureBackgroundPattern() {
-  if (backgroundPattern || !backgroundImage.complete || backgroundImage.naturalWidth === 0) return;
-
-  const tile = document.createElement("canvas");
-  tile.width = backgroundImage.naturalWidth * BACKGROUND_SCALE;
-  tile.height = backgroundImage.naturalHeight * BACKGROUND_SCALE;
-
-  const tileContext = tile.getContext("2d");
-  tileContext.imageSmoothingEnabled = false;
-  tileContext.drawImage(backgroundImage, 0, 0, tile.width, tile.height);
-
-  backgroundPattern = drawingContext.createPattern(tile, "repeat");
-}
-
 function drawBackground() {
-  ensureBackgroundPattern();
-  drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+  drawingContext.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
-  if (backgroundPattern) {
-    drawingContext.fillStyle = backgroundPattern;
-  } else {
-    // plain fill for the frame or two before the tile has decoded
-    drawingContext.fillStyle = "#e8d6b0";
+  // plain fill for the frame or two before the png has decoded
+  drawingContext.fillStyle = "#e8d6b0";
+  drawingContext.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+  if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
+    const drawWidth = backgroundImage.naturalWidth * BACKGROUND_SCALE;
+    const drawHeight = backgroundImage.naturalHeight * BACKGROUND_SCALE;
+    drawingContext.drawImage(
+      backgroundImage,
+      Math.round((VIRTUAL_WIDTH - drawWidth) / 2),
+      Math.round((VIRTUAL_HEIGHT - drawHeight) / 2),
+      drawWidth,
+      drawHeight
+    );
   }
-  drawingContext.fillRect(0, 0, canvas.width, canvas.height);
 
   // faint ground line the bag sits on
   drawingContext.fillStyle = "rgba(60, 35, 20, 0.12)";
-  drawingContext.fillRect(0, player.y + player.height + 14, canvas.width, canvas.height);
+  drawingContext.fillRect(0, player.y + player.height + 14, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 }
 
 function drawPlayer() {
@@ -372,14 +373,15 @@ function drawFloatingTexts() {
 
 function drawPausedLabel() {
   drawingContext.fillStyle = "rgba(9, 12, 28, 0.6)";
-  drawingContext.fillRect(0, 0, canvas.width, canvas.height);
+  drawingContext.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
   drawingContext.fillStyle = "#ffcf5c";
   drawingContext.font = "46px rainyhearts, 'Trebuchet MS', sans-serif";
   drawingContext.textAlign = "center";
-  drawingContext.fillText("paused", canvas.width / 2, canvas.height / 2);
+  drawingContext.fillText("paused", VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2);
 }
 
 function draw() {
+  drawingContext.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
   drawBackground();
   drawFallingObjects();
   drawPlayer();
@@ -423,7 +425,7 @@ document.addEventListener("keyup", (event) => {
 canvas.addEventListener("pointermove", (event) => {
   if (gameState !== "playing") return;
   const bounds = canvas.getBoundingClientRect();
-  const scale = canvas.width / bounds.width;
+  const scale = VIRTUAL_WIDTH / bounds.width;
   player.x = (event.clientX - bounds.left) * scale;
 });
 

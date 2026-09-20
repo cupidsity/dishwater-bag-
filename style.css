@@ -5,6 +5,7 @@
 }
 
 :root {
+  --hud-height: 52px;
   --page-background: #0d1020;
   --frame-background: #151a33;
   --text-color: #e8ecff;
@@ -22,6 +23,7 @@ body {
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at 50% 0%, #1d2450, var(--page-background) 70%);
+  padding: 12px;
   color: var(--text-color);
   font-family: "rainyhearts", "Trebuchet MS", sans-serif;
   user-select: none;
@@ -31,7 +33,10 @@ body {
 
 .game-frame {
   position: relative;
-  width: min(640px, 100vw);
+  width: min(
+    calc(100vw - 24px),
+    calc((100vh - 24px - var(--hud-height)) * 640 / 720)
+  );
   background: var(--frame-background);
   border-radius: 14px;
   overflow: hidden;
@@ -40,8 +45,10 @@ body {
 
 .hud {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  height: var(--hud-height);
+  padding: 0 18px;
   font-size: 22px;
   letter-spacing: 1px;
   background: rgba(0, 0, 0, 0.25);
