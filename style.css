@@ -56,7 +56,8 @@ canvas {
   display: block;
   width: 100%;
   height: auto;
-  background: linear-gradient(#10152e, #232a52);
+  background: #e8d6b0;
+  image-rendering: pixelated;
   touch-action: none;
 }
 

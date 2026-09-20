@@ -3,6 +3,25 @@
 const canvas = document.getElementById("gameCanvas");
 const drawingContext = canvas.getContext("2d");
 
+// pixel art, never let the browser blur it while scaling
+drawingContext.imageSmoothingEnabled = false;
+
+function loadImage(fileName) {
+  const image = new Image();
+  image.src = "assets/" + encodeURIComponent(fileName);
+  return image;
+}
+
+const backgroundImage = loadImage("background.png");
+const fallingFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`falling - ${frameNumber}.png`));
+
+// the background tile is tiny pixel art, blow it up by a whole number of pixels
+// so every source pixel stays a crisp square
+const BACKGROUND_SCALE = 4;
+const FALLING_FRAMES_PER_SECOND = 10;
+
+let backgroundPattern = null;
+
 const scoreValueElement = document.getElementById("scoreValue");
 const bestValueElement = document.getElementById("bestValue");
 const livesValueElement = document.getElementById("livesValue");
@@ -21,15 +40,12 @@ const BASE_SPAWN_INTERVAL = 0.85;
 // catches, so a perfect run never depends on frame perfect movement
 const REACH_SAFETY_FACTOR = 0.7;
 
-// a hazard landing this close in time to a catchable object must not block it
-const HAZARD_CLEARANCE_SECONDS = 0.45;
-
-// each falling kind: how it looks, what catching it does
+// every falling thing is the same cat, so the tiers are told apart by size:
+// spriteSize is what gets drawn, radius is the more forgiving catch box
 const FALLING_KINDS = [
-  { name: "drop", color: "#6fd3ff", radius: 15, points: 1, weight: 6, harmful: false },
-  { name: "bubble", color: "#b58cff", radius: 19, points: 3, weight: 3, harmful: false },
-  { name: "star", color: "#ffcf5c", radius: 13, points: 6, weight: 1.4, harmful: false },
-  { name: "sludge", color: "#ff5f6d", radius: 17, points: 0, weight: 2.0, harmful: true }
+  { name: "big cat", spriteSize: 120, radius: 34, points: 1, weight: 6, textColor: "#6b4a2f" },
+  { name: "medium cat", spriteSize: 94, radius: 27, points: 3, weight: 3, textColor: "#8c3f5d" },
+  { name: "small cat", spriteSize: 70, radius: 20, points: 6, weight: 1.4, textColor: "#b8432c" }
 ];
 
 const totalKindWeight = FALLING_KINDS.reduce((runningTotal, kind) => runningTotal + kind.weight, 0);
@@ -127,44 +143,24 @@ function pickReachableX(kind, arrivalTime) {
   return leftLimit + Math.random() * (rightLimit - leftLimit);
 }
 
-function conflictsWithCatch(x, kind, arrivalTime) {
-  const blockingDistance = player.width / 2 + kind.radius;
-  return catchCommitments.some((commitment) =>
-    Math.abs(commitment.arrivalTime - arrivalTime) < HAZARD_CLEARANCE_SECONDS
-    && Math.abs(commitment.x - x) < blockingDistance);
-}
-
-function pickHazardX(kind, arrivalTime) {
-  // retry a few times so a hazard rarely sits on top of something worth catching
-  let x = 0;
-  for (let attempt = 0; attempt < 8; attempt++) {
-    x = kind.radius + Math.random() * (canvas.width - kind.radius * 2);
-    if (!conflictsWithCatch(x, kind, arrivalTime)) return x;
-  }
-  return x;
-}
-
 function spawnFallingObject() {
   const kind = pickFallingKind();
   const fallSpeed = (BASE_FALL_SPEED + Math.random() * 90) * difficultyMultiplier();
-  // start fully visible at the very top edge so nothing pops in mid fall
-  const spawnY = kind.radius;
+  // start with the whole sprite on screen so no cat pops in mid fall
+  const spawnY = kind.spriteSize / 2;
   const arrivalTime = elapsedSeconds + (player.y - spawnY) / fallSpeed;
+  const x = pickReachableX(kind, arrivalTime);
 
-  const x = kind.harmful
-    ? pickHazardX(kind, arrivalTime)
-    : pickReachableX(kind, arrivalTime);
-
-  if (!kind.harmful) {
-    catchCommitments.push({ x, arrivalTime });
-  }
+  catchCommitments.push({ x, arrivalTime });
 
   fallingObjects.push({
     kind,
     x,
     y: spawnY,
     fallSpeed,
-    wobbleOffset: Math.random() * Math.PI * 2
+    wobbleOffset: Math.random() * Math.PI * 2,
+    // stagger the tumble so a screenful of cats is not in lockstep
+    animationTime: Math.random()
   });
 }
 
@@ -244,24 +240,18 @@ function updateFallingObjects(deltaSeconds) {
 
   for (const fallingObject of fallingObjects) {
     fallingObject.y += fallingObject.fallSpeed * deltaSeconds;
+    fallingObject.animationTime += deltaSeconds;
 
     if (isCaught(fallingObject)) {
-      if (fallingObject.kind.harmful) {
-        addFloatingText("ouch", fallingObject.x, fallingObject.y, "#ff8a94");
-        losePoint(1);
-      } else {
-        score += fallingObject.kind.points;
-        addFloatingText(`+${fallingObject.kind.points}`, fallingObject.x, fallingObject.y, fallingObject.kind.color);
-        updateHud();
-      }
+      score += fallingObject.kind.points;
+      addFloatingText(`+${fallingObject.kind.points}`, fallingObject.x, fallingObject.y,
+        fallingObject.kind.textColor);
+      updateHud();
       continue;
     }
 
     if (fallingObject.y - fallingObject.kind.radius > canvas.height) {
-      // sludge is safe to let through, everything else costs a life
-      if (!fallingObject.kind.harmful) {
-        losePoint(1);
-      }
+      losePoint(1);
       continue;
     }
 
@@ -296,11 +286,35 @@ function update(deltaSeconds) {
   updateFloatingTexts(deltaSeconds);
 }
 
+// the tile is only built once the png has actually decoded
+function ensureBackgroundPattern() {
+  if (backgroundPattern || !backgroundImage.complete || backgroundImage.naturalWidth === 0) return;
+
+  const tile = document.createElement("canvas");
+  tile.width = backgroundImage.naturalWidth * BACKGROUND_SCALE;
+  tile.height = backgroundImage.naturalHeight * BACKGROUND_SCALE;
+
+  const tileContext = tile.getContext("2d");
+  tileContext.imageSmoothingEnabled = false;
+  tileContext.drawImage(backgroundImage, 0, 0, tile.width, tile.height);
+
+  backgroundPattern = drawingContext.createPattern(tile, "repeat");
+}
+
 function drawBackground() {
+  ensureBackgroundPattern();
   drawingContext.clearRect(0, 0, canvas.width, canvas.height);
 
-  // faint ground line the basket sits on
-  drawingContext.fillStyle = "rgba(255, 255, 255, 0.05)";
+  if (backgroundPattern) {
+    drawingContext.fillStyle = backgroundPattern;
+  } else {
+    // plain fill for the frame or two before the tile has decoded
+    drawingContext.fillStyle = "#e8d6b0";
+  }
+  drawingContext.fillRect(0, 0, canvas.width, canvas.height);
+
+  // faint ground line the bag sits on
+  drawingContext.fillStyle = "rgba(60, 35, 20, 0.12)";
   drawingContext.fillRect(0, player.y + player.height + 14, canvas.width, canvas.height);
 }
 
@@ -321,23 +335,20 @@ function drawPlayer() {
 function drawFallingObjects() {
   for (const fallingObject of fallingObjects) {
     const wobble = Math.sin(elapsedSeconds * 4 + fallingObject.wobbleOffset) * 3;
+    const frameIndex = Math.floor(fallingObject.animationTime * FALLING_FRAMES_PER_SECOND)
+      % fallingFrames.length;
+    const frame = fallingFrames[frameIndex];
 
-    drawingContext.fillStyle = fallingObject.kind.color;
-    drawingContext.beginPath();
-    drawingContext.arc(fallingObject.x + wobble, fallingObject.y, fallingObject.kind.radius, 0, Math.PI * 2);
-    drawingContext.fill();
+    if (!frame.complete || frame.naturalWidth === 0) continue;
 
-    // small highlight so the shapes read as round
-    drawingContext.fillStyle = "rgba(255, 255, 255, 0.35)";
-    drawingContext.beginPath();
-    drawingContext.arc(
-      fallingObject.x + wobble - fallingObject.kind.radius * 0.3,
-      fallingObject.y - fallingObject.kind.radius * 0.3,
-      fallingObject.kind.radius * 0.28,
-      0,
-      Math.PI * 2
+    const size = fallingObject.kind.spriteSize;
+    drawingContext.drawImage(
+      frame,
+      Math.round(fallingObject.x + wobble - size / 2),
+      Math.round(fallingObject.y - size / 2),
+      size,
+      size
     );
-    drawingContext.fill();
   }
 }
 
@@ -345,8 +356,13 @@ function drawFloatingTexts() {
   drawingContext.font = "26px rainyhearts, 'Trebuchet MS', sans-serif";
   drawingContext.textAlign = "center";
 
+  drawingContext.lineWidth = 4;
+  drawingContext.lineJoin = "round";
+
   for (const floatingText of floatingTexts) {
     drawingContext.globalAlpha = Math.max(0, floatingText.lifeLeft / 0.8);
+    drawingContext.strokeStyle = "rgba(255, 248, 235, 0.9)";
+    drawingContext.strokeText(floatingText.text, floatingText.x, floatingText.y);
     drawingContext.fillStyle = floatingText.color;
     drawingContext.fillText(floatingText.text, floatingText.x, floatingText.y);
   }
