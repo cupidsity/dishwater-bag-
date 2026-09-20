@@ -1,0 +1,12 @@
+node_modules
+dist
+
+.git
+.gitignore
+.vercelignore
+.DS_Store
+
+README.md
+package.json
+package-lock.json
+vite.config.js
