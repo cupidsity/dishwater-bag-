@@ -25,11 +25,24 @@ function loadImage(fileName) {
 
 const backgroundImage = loadImage("background.png");
 const fallingFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`falling - ${frameNumber}.png`));
+const bagFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`bag - ${frameNumber}.png`));
 
 // the background is drawn once, blown up by a whole number of pixels so every
 // source pixel stays a crisp square, then centred and cropped to the canvas
 const BACKGROUND_SCALE = 8;
 const FALLING_FRAMES_PER_SECOND = 10;
+
+// the bag sits idle swapping between frames 1 and 2, then on a catch it plays
+// frame 5 (cat diving in) and frame 4 (cat settled) before going back to idle
+const BAG_IDLE_FRAMES_PER_SECOND = 2.5;
+const BAG_DIVE_SECONDS = 0.13;
+const BAG_SETTLE_SECONDS = 0.32;
+
+// the artwork sits inside a 640 square frame, these line the bag's mouth up with
+// the catch line and its body up with player.x
+const BAG_SPRITE_SIZE = 186;
+const BAG_OFFSET_X = -0.4836 * BAG_SPRITE_SIZE;
+const BAG_OFFSET_Y = -0.2188 * BAG_SPRITE_SIZE;
 
 const scoreValueElement = document.getElementById("scoreValue");
 const bestValueElement = document.getElementById("bestValue");
@@ -74,7 +87,10 @@ const player = {
   width: 110,
   height: 26,
   x: VIRTUAL_WIDTH / 2,
-  y: VIRTUAL_HEIGHT - 56
+  y: VIRTUAL_HEIGHT - 146,
+  idleAnimationTime: 0,
+  // counts up while the catch animation plays, null the rest of the time
+  catchAnimationTime: null
 };
 
 const pressedKeys = new Set();
@@ -197,6 +213,8 @@ function startGame() {
   elapsedSeconds = 0;
   timeUntilNextSpawn = 0.4;
   player.x = VIRTUAL_WIDTH / 2;
+  player.idleAnimationTime = 0;
+  player.catchAnimationTime = null;
   gameState = "playing";
   overlayElement.classList.add("hidden");
   updateHud();
@@ -236,6 +254,15 @@ function losePoint(amount) {
 }
 
 function updatePlayer(deltaSeconds) {
+  player.idleAnimationTime += deltaSeconds;
+
+  if (player.catchAnimationTime !== null) {
+    player.catchAnimationTime += deltaSeconds;
+    if (player.catchAnimationTime >= BAG_DIVE_SECONDS + BAG_SETTLE_SECONDS) {
+      player.catchAnimationTime = null;
+    }
+  }
+
   let direction = 0;
   if (pressedKeys.has("ArrowLeft") || pressedKeys.has("KeyA")) direction -= 1;
   if (pressedKeys.has("ArrowRight") || pressedKeys.has("KeyD")) direction += 1;
@@ -264,6 +291,7 @@ function updateFallingObjects(deltaSeconds) {
 
     if (isCaught(fallingObject)) {
       score += fallingObject.kind.points;
+      player.catchAnimationTime = 0;
       addFloatingText(`+${fallingObject.kind.points}`, fallingObject.x, fallingObject.y,
         fallingObject.kind.textColor);
       updateHud();
@@ -324,27 +352,28 @@ function drawBackground() {
       drawHeight
     );
   }
+}
 
-  // faint ground line the bag sits on
-  drawingContext.fillStyle = "rgba(102, 66, 48, 0.14)";
-  drawingContext.fillRect(0, player.y + player.height + 14, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+function currentBagFrame() {
+  if (player.catchAnimationTime !== null) {
+    return player.catchAnimationTime < BAG_DIVE_SECONDS ? bagFrames[4] : bagFrames[3];
+  }
+
+  const idleStep = Math.floor(player.idleAnimationTime * BAG_IDLE_FRAMES_PER_SECOND) % 2;
+  return bagFrames[idleStep];
 }
 
 function drawPlayer() {
-  const halfWidth = player.width / 2;
+  const frame = currentBagFrame();
+  if (!frame.complete || frame.naturalWidth === 0) return;
 
-  drawingContext.fillStyle = PALETTE.cream;
-  drawingContext.strokeStyle = PALETTE.barkDeep;
-  drawingContext.lineWidth = 3;
-  drawingContext.beginPath();
-  drawingContext.roundRect(player.x - halfWidth, player.y, player.width, player.height, 10);
-  drawingContext.fill();
-  drawingContext.stroke();
-
-  drawingContext.fillStyle = PALETTE.gold;
-  drawingContext.beginPath();
-  drawingContext.roundRect(player.x - halfWidth + 8, player.y + 4, player.width - 16, 7, 4);
-  drawingContext.fill();
+  drawingContext.drawImage(
+    frame,
+    Math.round(player.x + BAG_OFFSET_X),
+    Math.round(player.y + BAG_OFFSET_Y),
+    BAG_SPRITE_SIZE,
+    BAG_SPRITE_SIZE
+  );
 }
 
 function drawFallingObjects() {
