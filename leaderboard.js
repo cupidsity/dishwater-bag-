@@ -81,7 +81,10 @@ async function callSupabase(functionName, args) {
     throw new Error(`${functionName} failed: ${response.status} ${await response.text()}`);
   }
 
-  return response.json();
+  // a function that returns nothing comes back as 204 with an empty body, and
+  // calling json() on that throws, so only parse when there is something to parse
+  const body = await response.text();
+  return body === "" ? null : JSON.parse(body);
 }
 
 function setNote(text) {
@@ -152,7 +155,7 @@ async function submit(score) {
       new_score: Math.floor(score)
     });
   } catch (requestError) {
-    setNote("score could not be saved.");
+    setNote(`score could not be saved (${requestError.message}).`);
     console.error(requestError);
     return;
   }
