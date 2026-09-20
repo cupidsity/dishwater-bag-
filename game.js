@@ -342,7 +342,7 @@ function drawFallingObjects() {
 }
 
 function drawFloatingTexts() {
-  drawingContext.font = "bold 18px 'Trebuchet MS', sans-serif";
+  drawingContext.font = "26px rainyhearts, 'Trebuchet MS', sans-serif";
   drawingContext.textAlign = "center";
 
   for (const floatingText of floatingTexts) {
@@ -358,7 +358,7 @@ function drawPausedLabel() {
   drawingContext.fillStyle = "rgba(9, 12, 28, 0.6)";
   drawingContext.fillRect(0, 0, canvas.width, canvas.height);
   drawingContext.fillStyle = "#ffcf5c";
-  drawingContext.font = "bold 34px 'Trebuchet MS', sans-serif";
+  drawingContext.font = "46px rainyhearts, 'Trebuchet MS', sans-serif";
   drawingContext.textAlign = "center";
   drawingContext.fillText("paused", canvas.width / 2, canvas.height / 2);
 }
@@ -412,6 +412,13 @@ canvas.addEventListener("pointermove", (event) => {
 });
 
 startButton.addEventListener("click", startGame);
+
+// canvas text quietly falls back to the default font unless the face is already
+// loaded, so ask for it before the first frame is drawn
+if (document.fonts && document.fonts.load) {
+  document.fonts.load("26px rainyhearts").catch(() => {});
+  document.fonts.load("46px rainyhearts").catch(() => {});
+}
 
 requestAnimationFrame((timestamp) => {
   lastFrameTimestamp = timestamp;
