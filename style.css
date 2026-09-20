@@ -1,0 +1,106 @@
+:root {
+  --page-background: #0d1020;
+  --frame-background: #151a33;
+  --text-color: #e8ecff;
+  --accent-color: #ffcf5c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 0%, #1d2450, var(--page-background) 70%);
+  color: var(--text-color);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  user-select: none;
+}
+
+.game-frame {
+  position: relative;
+  width: min(640px, 100vw);
+  background: var(--frame-background);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.hud {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 18px;
+  font-size: 15px;
+  letter-spacing: 1px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.hud-item b {
+  color: var(--accent-color);
+  margin-left: 6px;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: linear-gradient(#10152e, #232a52);
+  touch-action: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(9, 12, 28, 0.86);
+  backdrop-filter: blur(3px);
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: 40px;
+  color: var(--accent-color);
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 340px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.overlay-keys {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+button {
+  margin-top: 12px;
+  padding: 12px 34px;
+  font: inherit;
+  font-size: 17px;
+  color: #1a1204;
+  background: var(--accent-color);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
