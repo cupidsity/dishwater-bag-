@@ -6,10 +6,20 @@
 
 :root {
   --hud-height: 52px;
-  --page-background: #0d1020;
-  --frame-background: #151a33;
-  --text-color: #e8ecff;
-  --accent-color: #ffcf5c;
+
+  /* every colour below is lifted from assets/background.png */
+  --sand: #ddbc94;
+  --cream: #f4e6d6;
+  --gold: #f9c05f;
+
+  --page-background: #38261c;
+  --page-glow: #5a3f2e;
+  --frame-background: #4a3426;
+  --hud-background: rgba(40, 27, 20, 0.5);
+  --overlay-background: rgba(56, 38, 28, 0.9);
+  --text-color: var(--cream);
+  --accent-color: var(--gold);
+  --button-text: #4a3226;
 }
 
 * {
@@ -22,7 +32,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 0%, #1d2450, var(--page-background) 70%);
+  background: radial-gradient(circle at 50% 0%, var(--page-glow), var(--page-background) 70%);
   padding: 12px;
   color: var(--text-color);
   font-family: "rainyhearts", "Trebuchet MS", sans-serif;
@@ -40,7 +50,7 @@ body {
   background: var(--frame-background);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 24px 60px rgba(28, 18, 12, 0.6);
 }
 
 .hud {
@@ -51,7 +61,7 @@ body {
   padding: 0 18px;
   font-size: 22px;
   letter-spacing: 1px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--hud-background);
 }
 
 .hud-item b {
@@ -63,7 +73,7 @@ canvas {
   display: block;
   width: 100%;
   height: auto;
-  background: #e8d6b0;
+  background: var(--sand);
   image-rendering: pixelated;
   touch-action: none;
 }
@@ -78,7 +88,7 @@ canvas {
   gap: 10px;
   padding: 24px;
   text-align: center;
-  background: rgba(9, 12, 28, 0.86);
+  background: var(--overlay-background);
   backdrop-filter: blur(3px);
 }
 
@@ -110,7 +120,7 @@ button {
   padding: 12px 34px;
   font: inherit;
   font-size: 24px;
-  color: #1a1204;
+  color: var(--button-text);
   background: var(--accent-color);
   border: none;
   border-radius: 999px;

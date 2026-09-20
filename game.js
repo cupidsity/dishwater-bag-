@@ -39,6 +39,17 @@ const overlayTitleElement = document.getElementById("overlayTitle");
 const overlayTextElement = document.getElementById("overlayText");
 const startButton = document.getElementById("startButton");
 
+// sampled from assets/background.png so everything drawn on the canvas sits in
+// the same palette as the art
+const PALETTE = {
+  sand: "#ddbc94",
+  cream: "#f4e6d6",
+  barkDeep: "#664230",
+  gold: "#f9c05f",
+  berry: "#cf5b4b",
+  ink: "#36536e"
+};
+
 const BEST_SCORE_STORAGE_KEY = "dishwaterBagBestScore";
 const STARTING_LIVES = 3;
 const PLAYER_SPEED = 560;
@@ -52,9 +63,9 @@ const REACH_SAFETY_FACTOR = 0.7;
 // every falling thing is the same cat, so the tiers are told apart by size:
 // spriteSize is what gets drawn, radius is the more forgiving catch box
 const FALLING_KINDS = [
-  { name: "big cat", spriteSize: 120, radius: 34, points: 1, weight: 6, textColor: "#6b4a2f" },
-  { name: "medium cat", spriteSize: 94, radius: 27, points: 3, weight: 3, textColor: "#8c3f5d" },
-  { name: "small cat", spriteSize: 70, radius: 20, points: 6, weight: 1.4, textColor: "#b8432c" }
+  { name: "big cat", spriteSize: 120, radius: 34, points: 1, weight: 6, textColor: PALETTE.barkDeep },
+  { name: "medium cat", spriteSize: 94, radius: 27, points: 3, weight: 3, textColor: PALETTE.ink },
+  { name: "small cat", spriteSize: 70, radius: 20, points: 6, weight: 1.4, textColor: PALETTE.berry }
 ];
 
 const totalKindWeight = FALLING_KINDS.reduce((runningTotal, kind) => runningTotal + kind.weight, 0);
@@ -299,7 +310,7 @@ function drawBackground() {
   drawingContext.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
   // plain fill for the frame or two before the png has decoded
-  drawingContext.fillStyle = "#e8d6b0";
+  drawingContext.fillStyle = PALETTE.sand;
   drawingContext.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
   if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
@@ -315,19 +326,22 @@ function drawBackground() {
   }
 
   // faint ground line the bag sits on
-  drawingContext.fillStyle = "rgba(60, 35, 20, 0.12)";
+  drawingContext.fillStyle = "rgba(102, 66, 48, 0.14)";
   drawingContext.fillRect(0, player.y + player.height + 14, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 }
 
 function drawPlayer() {
   const halfWidth = player.width / 2;
 
-  drawingContext.fillStyle = "#f2f4ff";
+  drawingContext.fillStyle = PALETTE.cream;
+  drawingContext.strokeStyle = PALETTE.barkDeep;
+  drawingContext.lineWidth = 3;
   drawingContext.beginPath();
   drawingContext.roundRect(player.x - halfWidth, player.y, player.width, player.height, 10);
   drawingContext.fill();
+  drawingContext.stroke();
 
-  drawingContext.fillStyle = "rgba(255, 207, 92, 0.85)";
+  drawingContext.fillStyle = PALETTE.gold;
   drawingContext.beginPath();
   drawingContext.roundRect(player.x - halfWidth + 8, player.y + 4, player.width - 16, 7, 4);
   drawingContext.fill();
@@ -362,7 +376,7 @@ function drawFloatingTexts() {
 
   for (const floatingText of floatingTexts) {
     drawingContext.globalAlpha = Math.max(0, floatingText.lifeLeft / 0.8);
-    drawingContext.strokeStyle = "rgba(255, 248, 235, 0.9)";
+    drawingContext.strokeStyle = PALETTE.cream;
     drawingContext.strokeText(floatingText.text, floatingText.x, floatingText.y);
     drawingContext.fillStyle = floatingText.color;
     drawingContext.fillText(floatingText.text, floatingText.x, floatingText.y);
@@ -372,9 +386,9 @@ function drawFloatingTexts() {
 }
 
 function drawPausedLabel() {
-  drawingContext.fillStyle = "rgba(9, 12, 28, 0.6)";
+  drawingContext.fillStyle = "rgba(56, 38, 28, 0.66)";
   drawingContext.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-  drawingContext.fillStyle = "#ffcf5c";
+  drawingContext.fillStyle = PALETTE.gold;
   drawingContext.font = "46px rainyhearts, 'Trebuchet MS', sans-serif";
   drawingContext.textAlign = "center";
   drawingContext.fillText("paused", VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2);
