@@ -27,6 +27,7 @@ const backgroundImage = loadImage("background.png");
 const fallingFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`falling - ${frameNumber}.png`));
 const bagFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`bag - ${frameNumber}.png`));
 const poopFrames = [loadImage("poop.png")];
+const idleFrames = [1, 2, 3].map((frameNumber) => loadImage(`idle - ${frameNumber}.png`));
 
 // the background is drawn once, blown up by a whole number of pixels so every
 // source pixel stays a crisp square, then centred and cropped to the canvas
@@ -35,6 +36,17 @@ const FALLING_FRAMES_PER_SECOND = 10;
 
 // a hazard landing this close in time to a cat must not stand in the way of it
 const HAZARD_CLEARANCE_SECONDS = 0.45;
+
+// the idle cat on the title screen, walked back down the frames so its tail
+// swishes one way then the other instead of snapping back to the start
+const IDLE_FRAMES_PER_SECOND = 4;
+const IDLE_FRAME_ORDER = [0, 1, 2, 1];
+
+// the opaque box the idle art occupies inside its 640 square frame, measured
+// across all three frames. centreX is where the cat's weight actually sits,
+// which is well left of the box middle because the tail sticks out to the right
+const IDLE_CONTENT = { left: 150, top: 100, width: 450, height: 480, centreX: 337 };
+const IDLE_MARGIN = 8;
 
 // the bag sits idle swapping between frames 1 and 2, then on a catch it holds
 // one of the two cat-in-the-bag poses long enough to read before going back
@@ -55,6 +67,10 @@ const overlayElement = document.getElementById("overlay");
 const overlayTitleElement = document.getElementById("overlayTitle");
 const overlayTextElement = document.getElementById("overlayText");
 const startButton = document.getElementById("startButton");
+
+const titleCatCanvas = document.getElementById("titleCat");
+const titleCatContext = titleCatCanvas.getContext("2d");
+titleCatContext.imageSmoothingEnabled = false;
 
 // sampled from assets/background.png so everything drawn on the canvas sits in
 // the same palette as the art
@@ -119,6 +135,9 @@ let elapsedSeconds = 0;
 let timeUntilNextSpawn = 0;
 let gameState = "menu"; // menu, playing, paused, over
 let lastFrameTimestamp = 0;
+
+// keeps running while the game is not, so the title screen can still animate
+let menuAnimationTime = 0;
 
 bestValueElement.textContent = bestScore;
 
@@ -456,6 +475,33 @@ function drawFloatingTexts() {
   drawingContext.globalAlpha = 1;
 }
 
+function drawTitleCat() {
+  const step = Math.floor(menuAnimationTime * IDLE_FRAMES_PER_SECOND) % IDLE_FRAME_ORDER.length;
+  const frame = idleFrames[IDLE_FRAME_ORDER[step]];
+
+  titleCatContext.clearRect(0, 0, titleCatCanvas.width, titleCatCanvas.height);
+  if (!frame.complete || frame.naturalWidth === 0) return;
+
+  const usableHalfWidth = titleCatCanvas.width / 2 - IDLE_MARGIN;
+  const usableHeight = titleCatCanvas.height - IDLE_MARGIN * 2;
+
+  // hanging the art off its centre of weight means whichever side reaches
+  // furthest from that point decides how big it can be
+  const widestReach = Math.max(
+    IDLE_CONTENT.centreX - IDLE_CONTENT.left,
+    IDLE_CONTENT.left + IDLE_CONTENT.width - IDLE_CONTENT.centreX
+  );
+  const scale = Math.min(usableHalfWidth / widestReach, usableHeight / IDLE_CONTENT.height);
+
+  titleCatContext.drawImage(
+    frame,
+    titleCatCanvas.width / 2 - IDLE_CONTENT.centreX * scale,
+    -IDLE_CONTENT.top * scale + (titleCatCanvas.height - IDLE_CONTENT.height * scale) / 2,
+    frame.naturalWidth * scale,
+    frame.naturalHeight * scale
+  );
+}
+
 function drawPausedLabel() {
   drawingContext.fillStyle = "rgba(56, 38, 28, 0.66)";
   drawingContext.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
@@ -477,9 +523,12 @@ function draw() {
 function gameLoop(timestamp) {
   const deltaSeconds = Math.min((timestamp - lastFrameTimestamp) / 1000, 0.05);
   lastFrameTimestamp = timestamp;
+  menuAnimationTime += deltaSeconds;
 
   if (gameState === "playing") update(deltaSeconds);
   draw();
+
+  if (gameState === "menu" || gameState === "over") drawTitleCat();
 
   requestAnimationFrame(gameLoop);
 }
