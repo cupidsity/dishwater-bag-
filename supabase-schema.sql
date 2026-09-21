@@ -1,9 +1,7 @@
--- run this once in the supabase sql editor.
+-- run once in the supabase sql editor.
 --
--- the table itself is locked down, row level security is on and there are no
--- policies, so the publishable key cannot read or write it directly. everything
--- goes through the two functions below, which run as the owner and are the only
--- things the browser is allowed to call.
+-- rls is on with no policies, so the publishable key cannot touch the table
+-- directly. the two functions below are the only things the browser may call.
 
 create table if not exists public.leaderboard (
   player_id  uuid primary key,
@@ -18,9 +16,8 @@ alter table public.leaderboard enable row level security;
 create index if not exists leaderboard_ranking
   on public.leaderboard (best_score desc, updated_at asc);
 
--- records a score for a player. the name is only ever set the first time a
--- player appears, so knowing someone's id is not enough to rename them, and the
--- score only ever moves up, so replaying a worse game cannot cost you your spot.
+-- the name is only set the first time a player appears, so a leaked id cannot be
+-- used to rename anyone, and the score only ever moves up.
 create or replace function public.submit_score(
   player uuid,
   player_name text,
@@ -51,8 +48,8 @@ begin
 end;
 $$;
 
--- the board itself. player ids are deliberately not returned, they are the only
--- thing standing between a stranger and writing to someone else's row.
+-- player ids are deliberately not returned, an id is the only thing standing
+-- between a stranger and writing to someone else's row.
 create or replace function public.get_leaderboard(board_size integer default 10)
 returns table (name text, best_score integer)
 language sql

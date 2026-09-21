@@ -1,7 +1,4 @@
-// leaderboard, talks to supabase over plain fetch so there is still no
-// dependency and no build step. until the two values below are filled in the
-// game behaves exactly as it did before, no name prompt and no board.
-
+// with these two blank there is no name prompt and no board, the game just runs
 const SUPABASE_URL = "https://ylqctfwccjcudbqrvhyc.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_-2RtuzRMwgEC48kWOs5gdg_eDXqob6y";
 
@@ -35,8 +32,8 @@ function writeStored(key, value) {
   }
 }
 
-// this id is what makes someone "the same player" next time, it lives only in
-// this browser, so another device or a cleared cache starts a new entry
+// this id is what makes someone the same player next time. it lives only in
+// this browser, so another device or a cleared cache is a new player
 function createPlayerId() {
   if (window.crypto && typeof window.crypto.randomUUID === "function") {
     return window.crypto.randomUUID();
@@ -180,8 +177,6 @@ function handleNameSubmit(event) {
   refresh();
 }
 
-// game.js asks this before it will start a round, so nobody plays before the
-// game knows who they are
 function needsName() {
   return isConfigured && playerName === null;
 }

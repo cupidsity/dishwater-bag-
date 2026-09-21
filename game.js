@@ -1,14 +1,9 @@
-// falling object catcher, plain canvas, no libraries
-
 const canvas = document.getElementById("gameCanvas");
 const drawingContext = canvas.getContext("2d");
 
-// every position and size in this file is in these units, independent of how
-// many real pixels the canvas ends up being drawn at
+// all game logic is in these units, whatever size the canvas ends up drawn at
 const VIRTUAL_WIDTH = 640;
 const VIRTUAL_HEIGHT = 720;
-
-// render at a multiple of that so the sprites stay sharp on a big screen
 const RENDER_SCALE = 2;
 
 canvas.width = VIRTUAL_WIDTH * RENDER_SCALE;
@@ -29,33 +24,28 @@ const bagFrames = [1, 2, 3, 4, 5].map((frameNumber) => loadImage(`bag - ${frameN
 const poopFrames = [loadImage("poop.png")];
 const idleFrames = [1, 2, 3].map((frameNumber) => loadImage(`idle - ${frameNumber}.png`));
 
-// the background is drawn once, blown up by a whole number of pixels so every
-// source pixel stays a crisp square, then centred and cropped to the canvas
+// whole number, so every source pixel stays a crisp square
 const BACKGROUND_SCALE = 8;
 const FALLING_FRAMES_PER_SECOND = 10;
 
-// a hazard landing this close in time to a cat must not stand in the way of it
+// a hazard landing this close in time to a cat must not block it
 const HAZARD_CLEARANCE_SECONDS = 0.45;
 
-// the idle cat on the title screen, walked back down the frames so its tail
-// swishes one way then the other instead of snapping back to the start
+// walked back down so the tail swishes instead of snapping back to the start
 const IDLE_FRAMES_PER_SECOND = 4;
 const IDLE_FRAME_ORDER = [0, 1, 2, 1];
 
-// the opaque box the idle art occupies inside its 640 square frame, measured
-// across all three frames. centreX is where the cat's weight actually sits,
-// which is well left of the box middle because the tail sticks out to the right
+// the opaque box inside the 640 square frame. centreX is where the cat's weight
+// sits, left of the box middle because the tail sticks out to the right
 const IDLE_CONTENT = { left: 150, top: 100, width: 450, height: 480, centreX: 337 };
 const IDLE_MARGIN = 8;
 
-// the bag sits idle swapping between frames 1 and 2, then on a catch it holds
-// one of the two cat-in-the-bag poses long enough to read before going back
 const BAG_IDLE_FRAMES_PER_SECOND = 2.5;
 const BAG_CATCH_SECONDS = 0.45;
 const BAG_CATCH_FRAMES = [3, 4];
 
-// the artwork sits inside a 640 square frame, these line the bag's mouth up with
-// the catch line and its body up with player.x
+// derived from the measured art box, these put the bag's mouth on the catch
+// line and its body on player.x
 const BAG_SPRITE_SIZE = 186;
 const BAG_OFFSET_X = -0.4836 * BAG_SPRITE_SIZE;
 const BAG_OFFSET_Y = -0.2188 * BAG_SPRITE_SIZE;
@@ -72,8 +62,7 @@ const titleCatCanvas = document.getElementById("titleCat");
 const titleCatContext = titleCatCanvas.getContext("2d");
 titleCatContext.imageSmoothingEnabled = false;
 
-// sampled from assets/background.png so everything drawn on the canvas sits in
-// the same palette as the art
+// sampled from assets/background.png
 const PALETTE = {
   sand: "#ddbc94",
   cream: "#f4e6d6",
@@ -89,13 +78,11 @@ const PLAYER_SPEED = 560;
 const BASE_FALL_SPEED = 170;
 const BASE_SPAWN_INTERVAL = 0.85;
 
-// only ever ask the player to use this fraction of their top speed between two
-// catches, so a perfect run never depends on frame perfect movement
+// never ask for more than this fraction of top speed between two catches, so a
+// perfect run never needs frame perfect movement
 const REACH_SAFETY_FACTOR = 0.7;
 
-// the cats are all the same sprite so their tiers are told apart by size, the
-// poop is its own sprite and is the one thing you are meant to let fall.
-// spriteSize is what gets drawn, radius is the more forgiving catch box
+// spriteSize is drawn, radius is the more forgiving catch box
 const FALLING_KINDS = [
   { name: "big cat", frames: fallingFrames, spriteSize: 120, radius: 34,
     points: 1, weight: 6, harmful: false, textColor: PALETTE.barkDeep },
@@ -115,7 +102,7 @@ const player = {
   x: VIRTUAL_WIDTH / 2,
   y: VIRTUAL_HEIGHT - 146,
   idleAnimationTime: 0,
-  // counts up while the catch pose is held, null the rest of the time
+  // null except while a catch pose is being held
   catchAnimationTime: null,
   catchFrameIndex: BAG_CATCH_FRAMES[0]
 };
@@ -125,8 +112,8 @@ const pressedKeys = new Set();
 let fallingObjects = [];
 let floatingTexts = [];
 
-// where and when the player has to be to catch each object still in flight,
-// used to keep every new spawn within reach of the previous one
+// where and when the player must be for each cat still in flight, so new spawns
+// can be kept within reach
 let catchCommitments = [];
 let score = 0;
 let bestScore = loadBestScore();
@@ -136,7 +123,6 @@ let timeUntilNextSpawn = 0;
 let gameState = "menu"; // menu, playing, paused, over
 let lastFrameTimestamp = 0;
 
-// keeps running while the game is not, so the title screen can still animate
 let menuAnimationTime = 0;
 
 bestValueElement.textContent = bestScore;
@@ -167,7 +153,6 @@ function pickFallingKind() {
 }
 
 function difficultyMultiplier() {
-  // speeds things up steadily but flattens out so it stays playable
   return 1 + Math.min(elapsedSeconds / 60, 1.25);
 }
 
@@ -256,7 +241,6 @@ function addFloatingText(text, x, y, color) {
 }
 
 function startGame() {
-  // no round starts until the leaderboard knows who is playing
   if (window.Leaderboard && window.Leaderboard.needsName()) return;
 
   fallingObjects = [];
@@ -560,7 +544,6 @@ document.addEventListener("keyup", (event) => {
   pressedKeys.delete(event.code);
 });
 
-// let the basket follow a pointer too, handy on a laptop trackpad or phone
 canvas.addEventListener("pointermove", (event) => {
   if (gameState !== "playing") return;
   const bounds = canvas.getBoundingClientRect();
