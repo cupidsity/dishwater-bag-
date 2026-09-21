@@ -2,8 +2,7 @@
 
 catch falling cats in a paper bag. miss three and it's over.
 
-a small browser game, plain html + css + javascript on a canvas. no framework,
-no bundler, nothing compiled.
+a small browser game, plain html + css + javascript on a canvas
 
 ## running it
 
@@ -18,12 +17,6 @@ the nicer way to work on it.
 you can also just open `index.html` in a browser. it needs no server at all, and
 that is deliberate, `game.js` is a plain script rather than a module so the page
 works straight off the filesystem.
-
-there is no build step. everything in the repo *is* the game, so deploying it
-means copying the files onto any static host. note that `vite build` will not
-produce a working `dist/`, it drops the plain script and the sprites, if you
-ever want a real bundled build the page has to move to a module script and the
-assets into `public/`.
 
 ## controls
 
@@ -67,82 +60,3 @@ to turn it on:
 3. copy the project url and the **publishable** key (`sb_publishable_...`) from
    project settings, api keys
 4. paste both into the top of `leaderboard.js`
-
-the publishable key is meant to sit in public client code, that is the whole
-point of it. supabase is retiring the older `anon` key by the end of 2026, so
-use the publishable one.
-
-### how it hangs together
-
-everyone gets a random id the first time they load the page, kept in
-`localStorage` alongside the name they typed. that id is what makes someone the
-same player next visit, so there is one row per person and a second game only
-ever raises their score, never adds a duplicate.
-
-worth knowing, that id lives in one browser. the same person on their phone, in
-another browser, or after clearing site data counts as somebody new. tying
-people together properly across devices means real accounts, which is a much
-bigger thing to build.
-
-the table has row level security on and no policies at all, so the key in the
-page cannot read or write it directly. the browser can only call two functions:
-
-| function | does |
-| --- | --- |
-| `submit_score` | upserts one row, keeps the higher score, caps the name at 16 characters |
-| `get_leaderboard` | returns names and scores only |
-
-`get_leaderboard` deliberately never returns player ids. an id is the only thing
-standing between a stranger and writing to someone else's row, so it stays out
-of the page. the name is set once when a player first appears and is never
-updated after, which means even a leaked id cannot be used to rename anybody.
-
-### it can still be cheated
-
-the game runs on the player's machine, so anyone who opens the console can call
-`Leaderboard.submit(99999)` by hand. the database caps a score at 100000 and
-refuses to lower an existing one, which stops the silly cases, but it cannot
-tell a real 300 from a typed one. that is true of any browser game without a
-server refereeing the play. fine for friends, not fine for prizes.
-
-## files
-
-| file | holds |
-| --- | --- |
-| `index.html` | the markup, the hud and the title / game over overlay |
-| `style.css` | page styling, the colour scheme and the responsive sizing |
-| `game.js` | everything else, the whole game |
-| `leaderboard.js` | names, player ids and talking to supabase |
-| `supabase-schema.sql` | the table and the two functions, run once |
-| `assets/` | the sprites, the background tile and the font |
-| `package.json` | the dev server script, vite is the only dependency |
-
-## assets
-
-| asset | used for |
-| --- | --- |
-| `background.png` | the playfield, drawn once at 8x |
-| `falling - 1..5` | the falling cat, a 5 frame tumble at 10fps |
-| `bag - 1`, `bag - 2` | the bag sitting idle, alternating at 2.5fps |
-| `bag - 4`, `bag - 5` | the two cat-in-the-bag poses, one picked at random per catch |
-| `idle - 1..3` | the cat on the title screen, played 1 - 2 - 3 - 2 at 4fps |
-| `poop.png` | the hazard, a single frame |
-| `rainyhearts.ttf` | the font, used by the page and the canvas both |
-
-`bag - 3.png` is a head-on view of the bag and is not currently used, the other
-bag frames are all three quarter views so it does not cut into the animation.
-
-## how it works
-
-### a fixed playfield, drawn bigger
-
-all the game logic works in a fixed 640 x 720 space (`VIRTUAL_WIDTH` and
-`VIRTUAL_HEIGHT`), so every position, speed and size is written in those units
-and never has to care what size the window is. the canvas itself is twice that,
-and each frame starts with a `setTransform` that scales drawing up to match.
-that keeps the sprites sharp on a big screen without touching any of the game
-numbers. the page then sizes the whole frame to fit the window, keeping the
-640:720 shape.
-
-the one place the difference matters is the mouse, which converts from screen
-pixels back into playfield units.
